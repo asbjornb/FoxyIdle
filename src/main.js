@@ -61,6 +61,19 @@ const particles = new Particles(scene);
 const rings = new Rings(scene);
 const sfx = new Sfx();
 
+// chevron on the ground pointing back home while your trail is exposed
+const homeArrow = (() => {
+  const sh = new THREE.Shape();
+  sh.moveTo(0.55, 0); sh.lineTo(-0.35, 0.5); sh.lineTo(-0.12, 0); sh.lineTo(-0.35, -0.5); sh.lineTo(0.55, 0);
+  const geo = new THREE.ShapeGeometry(sh);
+  geo.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false }));
+  m.renderOrder = 3;
+  m.scale.setScalar(1.5);
+  scene.add(m);
+  return m;
+})();
+
 // ---------------------------------------------------------------- world (per round)
 let world = null;
 let mode = 'menu'; // menu | countdown | playing | paused | ended
@@ -112,6 +125,7 @@ function newWorld(attract) {
     camTarget: new THREE.Vector3(game.human.x, 0, game.human.z),
     shake: 0, lastKillT: -10, multi: 0, deathInfo: null, wasOut: false, dangerT: 0,
     lbTimer: 0, mmTimer: 0,
+    homeFinder: new BotBrain(game, game.human, 0), home: null, homeT: 0,
   };
   // snap camera
   const t = world.camTarget;
@@ -255,6 +269,7 @@ function startGame() {
   $('killfeed').innerHTML = '';
   $('popups').innerHTML = '';
   newWorld(false);
+  celebrate = 0; lastTick = -1;
   mode = 'countdown';
   countdownT = 0; countdownStep = -1;
   $('countdown').classList.remove('hidden');
@@ -440,8 +455,11 @@ function handleEvents() {
   }
 }
 
+let celebrate = 0;
+let lastTick = -1;
 function onEnd(r) {
   mode = 'ended';
+  if (r.won) celebrate = 3.5;
   const g = world.game;
   $('danger').classList.remove('on');
   if (g.human.alive) g.human.brain = new BotBrain(g, g.human, 7); // keep the world alive behind the overlay
@@ -553,6 +571,40 @@ function frame(now) {
     $('danger').classList.toggle('on', dang >= 1);
     world.dangerT -= dt;
     if (dang >= 1 && world.dangerT <= 0) { sfx.warn(); world.dangerT = 0.5; }
+  }
+
+  // victory confetti
+  if (celebrate > 0) {
+    celebrate -= dt;
+    const t = world.camTarget;
+    const cols = g.players.map((p) => p.color).concat(['#ffffff', '#ffe27a']);
+    for (let k = 0; k < 6; k++) {
+      const c = new THREE.Color(cols[Math.floor(Math.random() * cols.length)]);
+      particles.emit(t.x + (Math.random() - 0.5) * 30, 12 + Math.random() * 4, t.z + (Math.random() - 0.5) * 20,
+        (Math.random() - 0.5) * 2, -2 - Math.random() * 2, (Math.random() - 0.5) * 2, c, 0.5 + Math.random() * 0.4, 3.5, Math.random() < 0.4 ? 1 : 0, -1.2);
+    }
+  }
+  // final countdown ticks
+  if (mode === 'playing' && g.timeLeft <= 10) {
+    const sec = Math.ceil(g.timeLeft);
+    if (sec !== lastTick && sec > 0) { lastTick = sec; sfx.tone(sec <= 3 ? 990 : 740, 0.08, { type: 'square', vol: 0.06 }); }
+  }
+
+  // home arrow
+  {
+    const show = mode === 'playing' && h.alive && h.trail.length > 3;
+    world.homeT -= dt;
+    if (show && world.homeT <= 0) { world.home = world.homeFinder.nearestOwn(); world.homeT = 0.2; }
+    const tgtOp = show && world.home ? Math.min(0.85, 0.25 + h.trail.length / 60) : 0;
+    homeArrow.material.opacity += (tgtOp - homeArrow.material.opacity) * Math.min(1, dt * 6);
+    if (world.home && homeArrow.material.opacity > 0.01) {
+      const a = Math.atan2(world.home.z - h.z, world.home.x - h.x);
+      const r = 3.0 + Math.sin(elapsed * 6) * 0.2;
+      homeArrow.position.set(h.x + Math.cos(a) * r, 0.14, h.z + Math.sin(a) * r);
+      homeArrow.rotation.y = -a;
+      homeArrow.material.color.set(h.color).lerp(new THREE.Color('#ffffff'), 0.45);
+      homeArrow.visible = true;
+    } else homeArrow.visible = homeArrow.material.opacity > 0.01;
   }
 
   // animals

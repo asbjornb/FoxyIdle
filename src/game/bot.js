@@ -168,10 +168,14 @@ export class BotBrain {
     let best = null; let bestD = radius;
     for (const o of g.players) {
       if (o === p || !o.alive || !o.trail.length) continue;
-      const step = Math.max(1, Math.floor(o.trail.length / 30));
-      for (let k = 0; k < o.trail.length; k += step) {
+      // aim at the trail behind them, not at their head (cuts, not head-on bumps)
+      const usable = o.trail.length - 6;
+      if (usable <= 0) continue;
+      const step = Math.max(1, Math.floor(usable / 30));
+      for (let k = 0; k < usable; k += step) {
         const i = o.trail[k];
         const x = (i % N) + 0.5; const z = ((i / N) | 0) + 0.5;
+        if (Math.hypot(x - o.x, z - o.z) < 4) continue;
         const d = Math.hypot(x - p.x, z - p.z);
         // only chase if I can plausibly get there before the owner closes the loop
         if (d < bestD) { bestD = d; best = { x, z, owner: o, d }; }
