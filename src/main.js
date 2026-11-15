@@ -96,6 +96,7 @@ let colliders = [];
 let titleBlend = 0; // 0 = title cam, 1 = follow cam
 let cinematicT = 0;
 let ended = false;
+const fxTimers = { dust: 0, pluck: 0 };
 
 fox.pos.set(FOX_START[0], 0, FOX_START[1]);
 fox.heading = Math.PI;
@@ -443,6 +444,15 @@ function updatePlay(dt) {
   if (s.status === 'lost') fox.state = 'meditate';
 
   game.tick(dt, workingAt);
+  // Little touches: dust puffs when running, soft plucks while working
+  fxTimers.dust -= dt * fox.speed;
+  if (fox.speed > 5.5 && fxTimers.dust < 0) {
+    fxTimers.dust = 1.6;
+    const gy = heightAt(fox.pos.x, fox.pos.z);
+    particles.burst(new THREE.Vector3(fox.pos.x, gy + 0.05, fox.pos.z), { count: 3, color: '#cdb894', size: 0.09, speed: 0.6, up: 0.4, g: 0.3, drag: 3, life: 0.7, floor: gy });
+  }
+  fxTimers.pluck -= dt;
+  if (workingAt && fxTimers.pluck < 0) { fxTimers.pluck = 0.9 + Math.random() * 0.6; audio.pluck(); }
   fox.setBasketFill(Math.min(1, s.res.berries / 60));
 
   if (hintShown > 6) ui.hideHint();
@@ -516,7 +526,9 @@ const MANUAL = new URLSearchParams(location.search).has('manual');
 function frame() {
   if (MANUAL) return;
   requestAnimationFrame(frame);
-  step(Math.min(clock.getDelta(), 0.05));
+  const raw = clock.getDelta();
+  adaptQuality(raw);
+  step(Math.min(raw, 0.05));
   render();
 }
 
@@ -560,6 +572,38 @@ window.addEventListener('resize', onResize);
 onResize();
 window.addEventListener('beforeunload', () => { if (mode === 'play' && game.s.status !== 'lost') game.save(); });
 
+// Idle while the tab is hidden: wisps keep working.
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); if (mode === 'play') game.save(); return; }
+  if (!hiddenAt || mode !== 'play') return;
+  const away = Math.min(7200, (Date.now() - hiddenAt) / 1000);
+  hiddenAt = 0;
+  const { gained } = game.applyOffline(away);
+  const parts = Object.entries(gained).filter(([, v]) => v >= 1).map(([k, v]) => `${Math.floor(v)} <i class="ic">${ICONS[k]}</i>`);
+  if (parts.length && away > 20) ui.toast(`While you were away, the wisps gathered ${parts.join(' ')}`, 'big');
+});
+
+// Adaptive quality: if frames are slow, step down resolution, then grass density.
+const quality = { level: 0, acc: 0, n: 0, cooldown: 4 };
+function adaptQuality(rawDt) {
+  if (MANUAL || mode === 'title') return;
+  quality.cooldown -= rawDt;
+  quality.acc += rawDt; quality.n++;
+  if (quality.n < 90) return;
+  const avg = quality.acc / quality.n;
+  quality.acc = 0; quality.n = 0;
+  if (quality.cooldown > 0 || avg < 1 / 40 || quality.level >= 4) return;
+  quality.level++;
+  quality.cooldown = 3;
+  const pr = [Math.min(window.devicePixelRatio, 2), 1.5, 1.0, 1.0, 0.8][quality.level];
+  renderer.setPixelRatio(Math.min(pr, window.devicePixelRatio));
+  composer.setPixelRatio(Math.min(pr, window.devicePixelRatio));
+  if (quality.level >= 3) world.grass.count = Math.floor(world.grass.count * 0.6);
+  if (quality.level >= 4) { renderer.shadowMap.type = THREE.PCFShadowMap; bloom.enabled = false; }
+  onResize();
+}
+
 stations.syncAll(game, false);
 refreshColliders();
 ui.showTitle({ hasSave: Game.hasSave(), onContinue: continueGame, onNew: newGame });
@@ -576,6 +620,7 @@ window.__foxy = {
   teleport(x, z) { fox.pos.set(x, 0, z); moveTarget = null; },
   give(res) { for (const k in res) game.gain(k, res[k]); },
   setDay(v) { world.dayTime = v; },
+  cam,
   primary: doPrimary,
   keys,
   advance(seconds, dt = 1 / 30) { for (let x = 0; x < seconds; x += dt) step(dt); render(); },

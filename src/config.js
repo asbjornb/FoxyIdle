@@ -41,7 +41,7 @@ export const STATIONS = {
     verb: 'Tending the flowers', blurb: 'Care for the soil and the glade breathes easier. Restores Harmony.',
   },
   shrine: {
-    name: 'Moss Shrine', area: 'east', pos: [28, -4], radius: 3.6, resource: 'spirit',
+    name: 'Moss Shrine', area: 'east', pos: [28, -4], radius: 4.3, resource: 'spirit',
     cycle: 3.2, yield: 4, anim: 'meditate', unlock: null,
     harmony: 0.8,
     upgradeBase: { wood: 16, berries: 12, spirit: 6 },

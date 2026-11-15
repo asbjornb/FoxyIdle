@@ -457,7 +457,7 @@ class PoolStation extends Station {
           float r = length(vP)/3.7;
           float rip = sin(r*40.0 - uTime*1.6)*0.5+0.5;
           float rip2 = sin(vP.x*3.0+uTime*0.7)*sin(vP.y*3.3-uTime*0.6)*0.5+0.5;
-          vec3 deep = vec3(0.01,0.05,0.12), shallow = vec3(0.04,0.18,0.26);
+          vec3 deep = vec3(0.004,0.02,0.05), shallow = vec3(0.012,0.06,0.09);
           vec3 col = mix(shallow, deep, smoothstep(0.2, 0.9, 1.0-r)*0.7 + rip2*0.15);
           vec3 cam = normalize(cameraPosition - vW);
           float fres = pow(1.0 - max(cam.y, 0.0), 4.0);

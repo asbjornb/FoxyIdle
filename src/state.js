@@ -282,23 +282,31 @@ export class Game {
         wisps: { ...base.wisps, ...d.wisps }, totals: { ...base.totals, ...d.totals } };
       // Offline progress: wisps keep working while away (max 2 hours), harmony is held steady.
       const away = Math.min(7200, Math.max(0, (Date.now() - (d.savedAt || Date.now())) / 1000));
-      const before = { ...this.s.res };
-      if (away > 5 && this.s.wispCount > 0) {
-        const h = this.s.harmony;
-        for (const id of PRODUCERS) {
-          const n = this.s.wisps[id];
-          if (!n || !this.stationActive(id)) continue;
-          const cyc = stationCycle(id, this.s.levels[id]);
-          this.produce(id, (away / cyc) * WISP.efficiency * n, false);
-        }
-        this.s.harmony = Math.max(h, Math.min(HARMONY.max, this.s.harmony));
-      }
+      const { before } = this.applyOffline(away);
       const gained = {};
       for (const k in before) gained[k] = this.s.res[k] - before[k];
       return { away, gained };
     } catch (e) {
       return null;
     }
+  }
+
+  // Wisps keep gathering while the player is away; harmony never drops while away.
+  applyOffline(seconds) {
+    const before = { ...this.s.res };
+    if (seconds > 5 && this.s.wispCount > 0 && this.s.status !== 'lost') {
+      const h = this.s.harmony;
+      for (const id of PRODUCERS) {
+        const n = this.s.wisps[id];
+        if (!n || !this.stationActive(id)) continue;
+        const cyc = stationCycle(id, this.s.levels[id]);
+        this.produce(id, (seconds / cyc) * WISP.efficiency * n, false);
+      }
+      this.s.harmony = Math.max(h, Math.min(HARMONY.max, this.s.harmony));
+    }
+    const gained = {};
+    for (const k in before) gained[k] = this.s.res[k] - before[k];
+    return { before, gained };
   }
 
   static clearSave() {
