@@ -101,6 +101,9 @@ function newWorld(attract) {
   if (attract) {
     game.human.brain = new BotBrain(game, game.human, 7);
     game.checkEnd = () => {};
+    // pre-simulate so the menu backdrop is already a colourful, contested meadow
+    for (let t = 0; t < 45; t += 1 / 30) game.update(1 / 30);
+    game.drainEvents();
   }
   const territory = new TerritoryLayer(game);
   scene.add(territory.mesh);
@@ -129,6 +132,7 @@ function newWorld(attract) {
   };
   // snap camera
   const t = world.camTarget;
+  if (attract) { t.x = Math.max(35, Math.min(GRID - 35, t.x)); t.z = Math.max(30, Math.min(GRID - 45, t.z)); }
   camera.position.set(t.x, attract ? 70 : 34, t.z + (attract ? 45 : 19));
   camera.lookAt(t);
 }
@@ -642,7 +646,8 @@ function frame(now) {
   const target = world.camTarget;
   if (focus) {
     const look = focus.alive ? 3 : 0;
-    const fx = focus.x + Math.cos(focus.angle) * look; const fz = focus.z + Math.sin(focus.angle) * look;
+    let fx = focus.x + Math.cos(focus.angle) * look; let fz = focus.z + Math.sin(focus.angle) * look;
+    if (world.attract) { fx = Math.max(35, Math.min(GRID - 35, fx)); fz = Math.max(30, Math.min(GRID - 45, fz)); }
     target.x += (fx - target.x) * Math.min(1, dt * (world.attract ? 0.8 : 5));
     target.z += (fz - target.z) * Math.min(1, dt * (world.attract ? 0.8 : 5));
   }
