@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Foxy Frontiers</title>
+  <meta name="description" content="Claim the enchanted meadow. A territory-capture game with fabulous animals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦊</text></svg>" />
+</head>
+<body>
+  <div id="app"></div>
+  <div id="vignette"></div>
+  <div id="danger"></div>
+  <div id="labels"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="leaderboard" class="panel"></div>
+    <div id="topbar">
+      <div id="timer" class="pill">2:30</div>
+      <div id="goal">Reach <b>25%</b> or lead when time runs out</div>
+    </div>
+    <div id="minimap-wrap" class="panel"><canvas id="minimap" width="150" height="150"></canvas></div>
+    <div id="killfeed"></div>
+    <div id="mystats">
+      <div class="share-ring"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle id="share-arc" cx="50" cy="50" r="42"/><circle id="goal-tick" cx="50" cy="50" r="42"/></svg><div id="share-text">0%</div></div>
+      <div class="statcol">
+        <div><span class="lbl">Rank</span><span id="rank-text">#1</span></div>
+        <div><span class="lbl">Kills</span><span id="kills-text">0</span></div>
+      </div>
+    </div>
+    <div id="popups"></div>
+    <div id="hint">Steer with <b>mouse</b>, <b>WASD</b>/<b>arrows</b> or <b>drag</b> on touch</div>
+    <button id="mute" class="iconbtn" title="Toggle sound">🔊</button>
+    <button id="pausebtn" class="iconbtn" title="Pause (Esc)">❚❚</button>
+  </div>
+
+  <div id="countdown" class="hidden"></div>
+  <div id="joystick" class="hidden"><div class="knob"></div></div>
+
+  <!-- Menu -->
+  <div id="menu" class="overlay">
+    <div class="menu-card">
+      <div class="title">
+        <span class="t1">Foxy</span><span class="t2">Frontiers</span>
+      </div>
+      <p class="tagline">Claim the enchanted meadow. Cut their trails. Guard your own.</p>
+      <div class="section-label">Choose your champion</div>
+      <div id="animal-grid"></div>
+      <div class="row">
+        <input id="name-input" maxlength="12" placeholder="Your name" autocomplete="off" />
+        <button id="play-btn" class="big-btn">Play</button>
+      </div>
+      <div class="howto">
+        <div><span class="ico">🧭</span><b>Steer</b> anywhere with mouse, keys or touch</div>
+        <div><span class="ico">🌀</span><b>Loop</b> outside your land, return to claim it</div>
+        <div><span class="ico">✂️</span><b>Cut</b> rival trails to eliminate them</div>
+        <div><span class="ico">👑</span><b>Win</b> at 25% or by leading at the bell</div>
+      </div>
+      <div id="best"></div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <div class="menu-card small">
+      <div class="end-title">Paused</div>
+      <div class="row center">
+        <button id="resume-btn" class="big-btn">Resume</button>
+        <button id="quit-btn" class="big-btn ghost">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End -->
+  <div id="end" class="overlay hidden">
+    <div class="menu-card small">
+      <div id="end-title" class="end-title">Victory!</div>
+      <div id="end-sub" class="end-sub"></div>
+      <div id="end-stats" class="stats-grid"></div>
+      <div id="end-best" class="end-best"></div>
+      <div class="row center">
+        <button id="again-btn" class="big-btn">Play again</button>
+        <button id="menu-btn" class="big-btn ghost">Change animal</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
