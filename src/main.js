@@ -504,6 +504,7 @@ function dangerFor(p) {
   return best < 6 ? 1 : best < 12 ? 0.5 : 0;
 }
 
+const perf = { js: 0 };
 let prevTime = performance.now();
 let elapsed = 0;
 function frame(now) {
@@ -599,7 +600,8 @@ function frame(now) {
     target.x += Math.sin(elapsed * 0.1) * 0.02;
   } else {
     const zoom = 1 + Math.min(0.45, h.trail.length / 160) + (h.alive ? 0 : 0.6);
-    height = 30 * zoom * camZoom; back = 17 * zoom * camZoom;
+    const portrait = camera.aspect < 1 ? 1.3 : 1;
+    height = 30 * zoom * camZoom * portrait; back = 17 * zoom * camZoom * portrait;
   }
   const cx = target.x; const cz = target.z + back;
   camera.position.x += (cx - camera.position.x) * Math.min(1, dt * 6);
@@ -633,6 +635,7 @@ function frame(now) {
     if (world.mmTimer <= 0) { drawMinimap(); world.mmTimer = 0.15; }
   }
 
+  perf.js += (performance.now() - now - perf.js) * 0.05;
   composer.render();
   adaptResolution(dt);
 }
@@ -664,7 +667,7 @@ window.addEventListener('resize', () => {
 
 // debug / test hooks
 window.__ff = {
-  get world() { return world; }, set camZoom(z) { camZoom = z; }, get mode() { return mode; }, startGame, showMenu,
+  get world() { return world; }, perf, set camZoom(z) { camZoom = z; }, get mode() { return mode; }, startGame, showMenu,
   setAngle(a) { if (world) world.game.human.targetAngle = a; },
   // fast-forward the simulation (testing): optionally let a bot brain drive the human
   advance(sec, autopilot = false) {

@@ -70,6 +70,7 @@ export class Game {
     for (let i = 0; i < numBots; i++) {
       const p = new Player(i + 1, others[i % others.length], names[i], true);
       p.brain = new BotBrain(this, p, i);
+      p.speed = PLAYER_SPEED * 0.95; // a small edge for the human
       this.players.push(p);
     }
     for (const p of this.players) this.spawn(p);
@@ -211,8 +212,10 @@ export class Game {
       const ox = p.cell % N; const oz = (p.cell / N) | 0;
       if (ox !== cx && oz !== cz) {
         // diagonal hop: visit an intermediate cell to keep the trail 4-connected
-        const fx = nx - cx; const fz = nz - cz;
-        const mid = (Math.abs(fx - 0.5) > Math.abs(fz - 0.5)) ? this.idx(ox, cz) : this.idx(cx, oz);
+        // prefer the corner cell that is safest for the mover (own land > neutral > own trail)
+        const m1 = this.idx(ox, cz); const m2 = this.idx(cx, oz);
+        const score = (m) => (this.owner[m] === p.code ? 2 : 0) - (this.trailGrid[m] === p.code ? 4 : 0);
+        const mid = score(m1) >= score(m2) ? m1 : m2;
         this.enterCell(p, mid);
         if (!p.alive) return;
       }

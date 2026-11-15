@@ -62,7 +62,65 @@ export class BotBrain {
       const c = cands[k];
       if (this.clearLine(c.x, c.z)) return c;
     }
-    return cands[0];
+    return this.pathHome() || cands[0];
+  }
+
+  // BFS around my own trail to the nearest own cell; returns the farthest
+  // path point that is still in clear line of sight (smoothed waypoint).
+  pathHome() {
+    return this.bfsHome(true) || this.bfsHome(false);
+  }
+
+  bfsHome(inflate) {
+    const g = this.g; const p = this.p; const code = p.code;
+    const prev = g.queue; // reuse game scratch buffers is unsafe during capture; use our own
+    if (!BotBrain.par) { BotBrain.par = new Int32Array(N * N); BotBrain.q = new Int32Array(N * N); BotBrain.seen = new Uint32Array(N * N); BotBrain.stamp = 0; }
+    void prev;
+    const par = BotBrain.par; const q = BotBrain.q; const seen = BotBrain.seen;
+    const stamp = ++BotBrain.stamp;
+    const L = p.trail.length;
+    const recent = new Set(p.trail.slice(Math.max(0, L - 3)));
+    let head = 0; let tail = 0;
+    q[tail++] = p.cell; seen[p.cell] = stamp; par[p.cell] = -1;
+    let goal = -1;
+    while (head < tail && head < 12000) {
+      const i = q[head++];
+      if (g.owner[i] === code && !g.trailGrid[i]) { goal = i; break; }
+      const x = i % N; const z = (i / N) | 0;
+      const nb = [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, z > 0 ? i - N : -1, z < N - 1 ? i + N : -1];
+      for (const j of nb) {
+        if (j < 0 || seen[j] === stamp) continue;
+        if (g.trailGrid[j] === code && !recent.has(j)) continue;
+        if (inflate && this.nearTrail(j, recent)) continue;
+        seen[j] = stamp; par[j] = i; q[tail++] = j;
+      }
+    }
+    if (goal < 0) return null;
+    const path = [];
+    for (let c = goal; c !== -1; c = par[c]) path.push(c);
+    path.reverse();
+    let pick = path[Math.min(path.length - 1, 1)];
+    for (let k = path.length - 1; k >= 1; k--) {
+      const c = path[k];
+      if (this.clearLine((c % N) + 0.5, ((c / N) | 0) + 0.5)) { pick = c; break; }
+    }
+    const x = (pick % N) + 0.5; const z = ((pick / N) | 0) + 0.5;
+    return { x, z, d: path.length };
+  }
+
+  nearTrail(j, recent) {
+    const g = this.g; const code = this.p.code;
+    const x = j % N; const z = (j / N) | 0;
+    if (Math.abs(x - (this.p.cell % N)) + Math.abs(z - ((this.p.cell / N) | 0)) <= 2) return false;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx; const zz = z + dz;
+        if (xx < 0 || zz < 0 || xx >= N || zz >= N) continue;
+        const k = zz * N + xx;
+        if (g.trailGrid[k] === code && !recent.has(k)) return true;
+      }
+    }
+    return false;
   }
 
   clearLine(tx, tz) {
@@ -71,10 +129,16 @@ export class BotBrain {
     const recent = new Set(p.trail.slice(Math.max(0, L - 4)));
     const dx = tx - p.x; const dz = tz - p.z; const d = Math.hypot(dx, dz);
     const steps = Math.ceil(d / 0.35);
+    const px = -dz / (d || 1) * 0.55; const pz = dx / (d || 1) * 0.55;
     for (let s = 1; s <= steps; s++) {
       const x = p.x + (dx * s) / steps; const z = p.z + (dz * s) / steps;
-      const i = Math.floor(z) * N + Math.floor(x);
-      if (g.trailGrid[i] === p.code && !recent.has(i)) return false;
+      // thick line: centre plus both shoulders
+      for (let k = -1; k <= 1; k++) {
+        const xx = x + px * k; const zz = z + pz * k;
+        if (xx < 0 || zz < 0 || xx >= N || zz >= N) continue;
+        const i = Math.floor(zz) * N + Math.floor(xx);
+        if (g.trailGrid[i] === p.code && !recent.has(i)) return false;
+      }
     }
     return true;
   }
@@ -265,33 +329,45 @@ export class BotBrain {
     return null;
   }
 
-  // Simulate the real turning arc toward angle a and test for my own trail / walls.
-  blocked(a) {
+  // Simulate the real turning arc toward angle a; returns time until hitting my own trail / a wall.
+  timeToCollision(a, horizon = 0.75) {
     const p = this.p; const g = this.g;
     const L = p.trail.length;
-    const recent = new Set(p.trail.slice(Math.max(0, L - 4)));
+    const recent = this._recent;
     let x = p.x; let z = p.z; let ang = p.angle;
     const dt = 0.04;
-    for (let t = 0; t < 0.62; t += dt) {
+    for (let t = dt; t < horizon; t += dt) {
       let d = a - ang;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       const mt = TURN_RATE * dt;
       ang += Math.max(-mt, Math.min(mt, d));
       x += Math.cos(ang) * p.speed * dt; z += Math.sin(ang) * p.speed * dt;
-      if (x < 0.8 || z < 0.8 || x > N - 0.8 || z > N - 0.8) return true;
-      const i = Math.floor(z) * N + Math.floor(x);
-      if (g.trailGrid[i] === p.code && !recent.has(i)) return true;
+      if (x < 0.8 || z < 0.8 || x > N - 0.8 || z > N - 0.8) return t;
+      if (!L) continue;
+      const sx = -Math.sin(ang) * 0.4; const sz = Math.cos(ang) * 0.4;
+      for (let k = -1; k <= 1; k++) {
+        const i = Math.floor(z + sz * k) * N + Math.floor(x + sx * k);
+        if (g.trailGrid[i] === p.code && !recent.has(i)) return t;
+      }
     }
-    return false;
+    return Infinity;
   }
 
+  blocked(a) { return this.timeToCollision(a) !== Infinity; }
+
   avoid(desired) {
+    const p = this.p;
+    this._recent = new Set(p.trail.slice(Math.max(0, p.trail.length - 4)));
     const offsets = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.45, -1.45, 1.9, -1.9, 2.4, -2.4, 2.9, -2.9];
+    let best = desired; let bestT = -1;
     for (const o of offsets) {
       const a = desired + o;
-      if (!this.blocked(a)) return a;
+      const t = this.timeToCollision(a);
+      if (t === Infinity) return a;
+      if (t > bestT) { bestT = t; best = a; }
     }
-    return desired;
+    return best; // boxed in: take the escape that survives longest
   }
+
 }
