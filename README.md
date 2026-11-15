@@ -11,6 +11,10 @@ npm run build     # production build in dist/
 npm run preview   # serve the production build
 ```
 
+## Deploying
+
+Pushes to `main` are deployed to GitHub Pages by `.github/workflows/deploy-pages.yml`. One-time setup: in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**. The game is then served at `https://<owner>.github.io/FoxyIdle/`. You can also run the workflow by hand from the Actions tab.
+
 ## How to play
 
 | Input | Action |
